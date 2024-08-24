@@ -2,15 +2,13 @@ package camp.nextstep.jdbc.core;
 
 import camp.nextstep.config.MyConfiguration;
 import camp.nextstep.domain.User;
+import camp.nextstep.jdbc.transaction.TransactionSection;
 import camp.nextstep.support.jdbc.init.DatabasePopulatorUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
@@ -102,22 +100,21 @@ class JdbcTemplateTest {
     }
 
     @Test
-    void testUpdateWithConnection() throws SQLException {
-        Connection connectionSpy = spy(dataSource.getConnection());
+    void testUpdateWithConnection() {
+        TransactionSection transactionSection = TransactionSection.from(dataSource);
         String givenAccount = "new-account";
         String givenPassword = "new-password";
 
-        jdbcTemplate.update(connectionSpy,
+        jdbcTemplate.update(transactionSection,
                             "update users set account=?, password=? where id=?",
                             givenAccount,
                             givenPassword,
                             1L);
+        transactionSection.commit();
 
         assertThat(findUserById(1L))
                 .hasFieldOrPropertyWithValue("account", givenAccount)
                 .hasFieldOrPropertyWithValue("password", givenPassword);
-
-        verify(connectionSpy).prepareStatement("update users set account=?, password=? where id=?");
     }
 
     private User mapUserRow(final ResultSet resultSet) throws SQLException {

@@ -1,16 +1,14 @@
 package camp.nextstep.service;
 
-import camp.nextstep.dao.DataAccessException;
 import camp.nextstep.dao.UserDao;
 import camp.nextstep.dao.UserHistoryDao;
 import camp.nextstep.domain.User;
 import camp.nextstep.domain.UserHistory;
+import camp.nextstep.jdbc.transaction.TransactionSection;
 import com.interface21.beans.factory.annotation.Autowired;
 import com.interface21.context.stereotype.Service;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.SQLException;
 
 @Service
 public class UserService {
@@ -46,33 +44,11 @@ public class UserService {
     }
 
     private void changePasswordInTransaction(String createBy, User user) {
-        Connection connection = null;
-        try {
-            connection = dataSource.getConnection();
+        try (TransactionSection transactionSection = TransactionSection.from(dataSource)) {
+            userDao.update(transactionSection, user);
+            userHistoryDao.log(transactionSection, new UserHistory(user, createBy));
 
-            connection.setAutoCommit(false);
-
-            userDao.update(connection, user);
-            userHistoryDao.log(connection, new UserHistory(user, createBy));
-
-            connection.commit();
-        } catch (SQLException e) {
-            if (connection != null) {
-                try {
-                    connection.rollback();
-                } catch (SQLException ex) {
-                    throw new DataAccessException(ex);
-                }
-            }
-            throw new DataAccessException(e);
-
-        } finally {
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                }
-            }
+            transactionSection.commit();
         }
     }
 }

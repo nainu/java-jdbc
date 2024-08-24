@@ -3,6 +3,7 @@ package camp.nextstep.dao;
 import camp.nextstep.config.MyConfiguration;
 import camp.nextstep.domain.User;
 import camp.nextstep.jdbc.core.JdbcTemplate;
+import camp.nextstep.jdbc.transaction.TransactionSection;
 import camp.nextstep.support.jdbc.init.DatabasePopulatorUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,14 +16,13 @@ class UserDaoTest {
 
     private UserDao userDao;
     private DataSource dataSource;
-    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setup() {
         final var myConfiguration = new MyConfiguration();
         dataSource = myConfiguration.dataSource();
         DatabasePopulatorUtils.execute(dataSource);
-        jdbcTemplate = new JdbcTemplate(dataSource);
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
         userDao = new UserDao(jdbcTemplate);
         final var user = new User("setup-gugu", "password", "hkkang@woowahan.com");
@@ -70,7 +70,8 @@ class UserDaoTest {
         final var user = userDao.findById(1L);
         user.changePassword(newPassword);
 
-        userDao.update(dataSource.getConnection(), user);
+        TransactionSection transactionSection = TransactionSection.from(dataSource);
+        userDao.update(transactionSection, user);
 
         final var actual = userDao.findById(1L);
 

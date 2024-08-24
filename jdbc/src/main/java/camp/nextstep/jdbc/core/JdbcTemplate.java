@@ -1,6 +1,7 @@
 package camp.nextstep.jdbc.core;
 
 import camp.nextstep.dao.DataAccessException;
+import camp.nextstep.jdbc.transaction.TransactionSection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,8 +55,8 @@ public class JdbcTemplate {
     }
 
     private <T> T doQuery(final String sql, final SqlQueryFunction<PreparedStatement, T> sqlQueryFunction) {
-        try (final Connection conn = dataSource.getConnection();
-             final PreparedStatement psmt = conn.prepareStatement(sql)) {
+        try (TransactionSection transactionSection = TransactionSection.from(dataSource);
+             final PreparedStatement psmt = transactionSection.getConnection().prepareStatement(sql)) {
             return sqlQueryFunction.apply(psmt);
         } catch (SQLException e) {
             log.error(e.getMessage(), e);
@@ -68,28 +69,31 @@ public class JdbcTemplate {
     }
 
     public void update(final String sql, final PreparedStatementSetter pss) {
-        try (final Connection connection = dataSource.getConnection()) {
-            update(connection, sql, pss);
-        } catch (SQLException e) {
-            log.error(e.getMessage(), e);
-            throw new DataAccessException(e);
+        try (TransactionSection transactionSection = TransactionSection.from(dataSource)) {
+            update(transactionSection, sql, pss);
+            transactionSection.commit();
         }
     }
 
-    public void update(final Connection connection, final String sql, final Object... parameters) {
-        update(connection, sql, new PreparedStatementSetterImpl(parameters));
+    public void update(final TransactionSection transactionSection,
+                       final String sql,
+                       final Object... parameters) {
+        update(transactionSection, sql, new PreparedStatementSetterImpl(parameters));
     }
 
-    public void update(final Connection connection, final String sql, final PreparedStatementSetter pss) {
-        doExecute(connection, sql, psmt -> {
+    public void update(final TransactionSection transactionSection,
+                       final String sql,
+                       final PreparedStatementSetter pss) {
+        doExecute(transactionSection, sql, psmt -> {
             pss.setValues(psmt);
             psmt.executeUpdate();
         });
     }
 
-    private static void doExecute(final Connection connection,
+    private static void doExecute(final TransactionSection transactionSection,
                                   final String sql,
                                   final SqlExecuteFunction<PreparedStatement> sqlExecuteFunction) {
+        Connection connection = transactionSection.getConnection();
         try (final PreparedStatement psmt = connection.prepareStatement(sql)) {
             sqlExecuteFunction.run(psmt);
         } catch (SQLException e) {

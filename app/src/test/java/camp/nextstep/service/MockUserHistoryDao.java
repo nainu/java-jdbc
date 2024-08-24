@@ -4,8 +4,7 @@ import camp.nextstep.dao.DataAccessException;
 import camp.nextstep.dao.UserHistoryDao;
 import camp.nextstep.domain.UserHistory;
 import camp.nextstep.jdbc.core.JdbcTemplate;
-
-import java.sql.Connection;
+import camp.nextstep.jdbc.transaction.TransactionSection;
 
 public class MockUserHistoryDao extends UserHistoryDao {
 
@@ -14,7 +13,7 @@ public class MockUserHistoryDao extends UserHistoryDao {
     }
 
     @Override
-    public void log(Connection connection, final UserHistory userHistory) {
+    public void log(TransactionSection transactionSection, final UserHistory userHistory) {
         throw new DataAccessException();
     }
 }
